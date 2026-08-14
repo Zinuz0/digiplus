@@ -11,6 +11,7 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 
 import incidentRoutes from './routes/incidentRoutes.js';
 import knowledgeRoutes from './routes/knowledgeRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -49,6 +50,8 @@ app.get('/', (req, res) => res.redirect(301, FRONTEND_URL));
 // connected (bufferTimeoutMS gives 90 seconds for the DB to come up).
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/admin', adminRoutes);
+
 
 
 // ─── Health check ─────────────────────────────────────────────────────────────
