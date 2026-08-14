@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 import uvicorn
 import logging
 
@@ -8,10 +8,10 @@ app = FastAPI(title="Embedding Service")
 logger = logging.getLogger("uvicorn.error")
 
 # Load model globally so it's loaded only once at startup
-MODEL_NAME = "all-MiniLM-L6-v2"
-logger.info(f"Loading model {MODEL_NAME}...")
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+logger.info(f"Loading model {MODEL_NAME} via fastembed...")
 try:
-    model = SentenceTransformer(MODEL_NAME)
+    model = TextEmbedding(model_name=MODEL_NAME)
     logger.info("Model loaded successfully.")
 except Exception as e:
     logger.error(f"Failed to load model: {e}")
@@ -31,8 +31,9 @@ def embed(request: EmbedRequest):
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
     
     try:
-        # Generate embedding
-        embedding = model.encode(request.text).tolist()
+        # Generate embedding (fastembed expects a list of texts and returns a generator of numpy arrays)
+        embeddings = list(model.embed([request.text]))
+        embedding = embeddings[0].tolist()
         return EmbedResponse(embedding=embedding)
     except Exception as e:
         logger.error(f"Error generating embedding: {e}")
