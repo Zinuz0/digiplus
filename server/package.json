@@ -10,6 +10,7 @@
     "ingest": "node scripts/ingestKnowledgeBase.js"
   },
   "dependencies": {
+    "@google/genai": "^2.17.1",
     "@google/generative-ai": "^0.21.0",
     "cors": "^2.8.5",
     "csv-parse": "^5.5.6",

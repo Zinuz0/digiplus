@@ -1,19 +1,13 @@
 // server/services/aiService.js
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { buildIncidentAnalysisPrompt } from '../prompts/incidentAnalysisPrompt.js';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const apiKey = process.env.LLM_API_KEY || process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.error('❌ Neither LLM_API_KEY nor GEMINI_API_KEY is set!');
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const ai = new GoogleGenAI({ apiKey });
 
 /**
  * Validate the LLM's JSON response matches expected schema
@@ -66,21 +60,17 @@ function extractJSON(text) {
  * @returns {Promise<Object>} Structured AI analysis
  */
 export async function analyzeIncident(incident, relevantKnowledge) {
-  // gemini-3.1-flash-lite is fast and confirmed working
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
-    generationConfig: {
-      temperature: 0.3,
-    }
-  });
-
   const prompt = buildIncidentAnalysisPrompt(incident, relevantKnowledge);
 
   let rawText;
   try {
-    console.log('🤖 Calling Gemini API...');
-    const result = await model.generateContent(prompt);
-    rawText = result.response.text();
+    console.log('🤖 Calling Gemini API (gemini-2.5-flash)...');
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: { temperature: 0.3 }
+    });
+    rawText = response.text;
     console.log('✅ Gemini responded successfully');
   } catch (err) {
     console.error('❌ Gemini API error:', err.message);
