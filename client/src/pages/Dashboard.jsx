@@ -34,37 +34,8 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [wakingUp, setWakingUp] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-  // Wait until MongoDB is connected by polling /api/health
-  const waitForDB = useCallback(() => {
-    return new Promise((resolve) => {
-      let elapsed = 0;
-      setWakingUp(true);
-      setElapsedSeconds(0);
-
-      const tick = setInterval(() => {
-        elapsed++;
-        setElapsedSeconds(elapsed);
-      }, 1000);
-
-      const poll = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE.replace('/api', '')}/api/health`);
-          const data = await res.json();
-          if (data.mongodb === 'connected') {
-            clearInterval(poll);
-            clearInterval(tick);
-            setWakingUp(false);
-            resolve();
-          }
-        } catch {
-          // Server still waking up, keep polling
-        }
-      }, 3000);
-    });
-  }, [API_BASE]);
+  const retryTimerRef = useState(null);
+  const elapsedTimerRef = useState(null);
 
   const loadData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -75,6 +46,8 @@ export default function Dashboard() {
         incidentAPI.getAll({ ...filters, limit: 30 }),
       ]);
 
+      const anySuccess = [statsResult, kbStatsResult, incidentsResult].some(r => r.status === 'fulfilled');
+
       if (statsResult.status === 'fulfilled') setStats(statsResult.value);
       if (kbStatsResult.status === 'fulfilled') setKnowledgeStats(kbStatsResult.value);
       if (incidentsResult.status === 'fulfilled') {
@@ -82,22 +55,35 @@ export default function Dashboard() {
         setPagination(incidentsResult.value.pagination);
       }
 
-      const allFailed = [statsResult, kbStatsResult, incidentsResult].every(r => r.status === 'rejected');
-      if (allFailed) {
-        // DB not ready yet — wait for health check to confirm DB is up, then retry
-        await waitForDB();
-        return loadData();
+      if (anySuccess) {
+        // At least some data loaded — show the dashboard
+        setWakingUp(false);
+        setError(null);
+        if (elapsedTimerRef[0]) clearInterval(elapsedTimerRef[0]);
+      } else {
+        // Nothing loaded yet — server is starting up, retry in 5s
+        setWakingUp(true);
+        setError(null);
+        if (!elapsedTimerRef[0]) {
+          elapsedTimerRef[0] = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+        }
+        retryTimerRef[0] = setTimeout(() => loadData(), 5000);
       }
-      setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filters, waitForDB]);
+  }, [filters]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+    return () => {
+      if (retryTimerRef[0]) clearTimeout(retryTimerRef[0]);
+      if (elapsedTimerRef[0]) clearInterval(elapsedTimerRef[0]);
+    };
+  }, [loadData]);
 
 
   if (loading) {

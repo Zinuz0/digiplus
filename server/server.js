@@ -19,16 +19,13 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  process.env.CLIENT_URL,          // e.g. https://digiplus-lime.vercel.app
+  process.env.CLIENT_URL,
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
-    // Allow any vercel.app deployment (production + previews)
     if (origin.endsWith('.vercel.app')) return callback(null, true);
-    // Allow any explicitly listed origin
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
@@ -43,27 +40,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── DB-ready guard ───────────────────────────────────────────────────────────
-// Returns 503 with a specific code while MongoDB is still connecting so the
-// frontend can show a "server starting up" message and auto-retry.
-function requireDB(req, res, next) {
-  if (mongoose.connection.readyState === 1) return next();
-  res.status(503).json({
-    error: 'Service starting up',
-    code: 'DB_NOT_READY',
-    retryAfter: 5
-  });
-}
-
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/incidents', requireDB, incidentRoutes);
-app.use('/api/knowledge', requireDB, knowledgeRoutes);
+// NOTE: No requireDB guard — Mongoose buffers queries automatically until
+// connected (bufferTimeoutMS gives 90 seconds for the DB to come up).
+app.use('/api/incidents', incidentRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'connecting',
+    readyState: mongoose.connection.readyState,
     timestamp: new Date().toISOString()
   });
 });
@@ -82,57 +70,60 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ─── MongoDB + Server start ───────────────────────────────────────────────────
+// ─── MongoDB connection ───────────────────────────────────────────────────────
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/service-desk';
 
-// Mongoose connection options - tuned for Atlas Free Tier stability
 const mongoOptions = {
-  serverSelectionTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
-  maxPoolSize: 5,
-  minPoolSize: 1,
-  heartbeatFrequencyMS: 10000,
-  retryWrites: true,
-  retryReads: true,
-  family: 4, // Force IPv4 to bypass Render's DNS IPv6 resolution/Atlas TLS handshake issue
+  serverSelectionTimeoutMS: 8000,   // how long to wait per attempt
+  socketTimeoutMS: 60000,
+  bufferCommands: true,             // Mongoose buffers ops until connected
+  maxPoolSize: 3,
+  family: 4,                        // Force IPv4
 };
 
+let isConnecting = false;
+
 async function connectMongo() {
+  if (isConnecting) return;
+  isConnecting = true;
+  let attempt = 0;
   while (true) {
+    attempt++;
     try {
       const sanitizedUri = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
-      console.log(`📡 Attempting MongoDB connection to: ${sanitizedUri}`);
+      console.log(`📡 [Attempt ${attempt}] Connecting to: ${sanitizedUri}`);
       await mongoose.connect(MONGODB_URI, mongoOptions);
-      console.log(`✅ MongoDB connected!`);
-      break; // Exit loop on success
+      console.log(`✅ MongoDB connected on attempt ${attempt}`);
+      isConnecting = false;
+      break;
     } catch (err) {
-      console.error('❌ MongoDB connection failed:', err.message);
-      console.log('🔄 Retrying in 10 seconds...');
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      console.error(`❌ [Attempt ${attempt}] MongoDB failed: ${err.message}`);
+      // Shorter delay on first few retries, then back off
+      const delay = attempt <= 3 ? 3000 : attempt <= 6 ? 5000 : 10000;
+      console.log(`🔄 Retrying in ${delay / 1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 }
 
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️  MongoDB disconnected - attempting to reconnect...');
-  connectMongo(); // Re-trigger connection loop on disconnect
+  console.warn('⚠️  MongoDB disconnected');
+  // Mongoose will auto-reconnect; only manually trigger if completely dropped
+  if (!isConnecting) connectMongo();
 });
 
 mongoose.connection.on('reconnected', () => {
   console.log('✅ MongoDB reconnected');
+  isConnecting = false;
 });
 
 mongoose.connection.on('error', (err) => {
   console.error('❌ MongoDB error:', err.message);
 });
 
-// ─── Start HTTP server FIRST so Render's port scan succeeds ──────────────────
-// MongoDB connects in the background. API calls will gracefully handle
-// the case when DB is not yet connected.
+// ─── Start server immediately, connect MongoDB in background ─────────────────
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📋 API available at http://localhost:${PORT}/api`);
-  // Connect to MongoDB in background after server is up
   connectMongo();
 });
 
