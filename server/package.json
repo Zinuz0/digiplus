@@ -1,0 +1,21 @@
+{
+  "name": "service-desk-server",
+  "version": "1.0.0",
+  "description": "AI-Powered Service Desk Backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "ingest": "node scripts/ingestKnowledgeBase.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongodb": "^7.5.0",
+    "mongoose": "^8.4.4"
+  }
+}

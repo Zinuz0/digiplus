@@ -1,0 +1,16 @@
+{
+  "name": "digiplus-service-desk",
+  "version": "1.0.0",
+  "description": "AI-Powered Service Desk — DigiPlus Technical Assessment",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" --names \"SERVER,CLIENT\" --prefix-colors \"cyan,green\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "ingest": "npm run ingest --prefix server",
+    "install:all": "npm install --prefix server && npm install --prefix client"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
