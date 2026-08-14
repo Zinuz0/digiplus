@@ -41,10 +41,15 @@ app.use((req, res, next) => {
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
+// ─── Redirect root hits (e.g. from Render URL) to the Vercel frontend ─────────
+const FRONTEND_URL = process.env.CLIENT_URL || 'https://digiplus-lime.vercel.app';
+app.get('/', (req, res) => res.redirect(301, FRONTEND_URL));
+
 // NOTE: No requireDB guard — Mongoose buffers queries automatically until
 // connected (bufferTimeoutMS gives 90 seconds for the DB to come up).
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
+
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
