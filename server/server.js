@@ -68,6 +68,7 @@ const mongoOptions = {
   heartbeatFrequencyMS: 10000,
   retryWrites: true,
   retryReads: true,
+  family: 4, // Force IPv4 to bypass Render's DNS IPv6 resolution/Atlas TLS handshake issue
 };
 
 async function startServer() {
