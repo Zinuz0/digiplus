@@ -68,7 +68,7 @@ function extractJSON(text) {
 export async function analyzeIncident(incident, relevantKnowledge) {
   // gemini-3.1-flash-lite is fast and confirmed working
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0.3,
     }
