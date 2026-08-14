@@ -73,26 +73,25 @@ const mongoOptions = {
   tlsAllowInvalidCertificates: true, // Bypass cert validation if Render container lacks Atlas root CAs
 };
 
-async function startServer() {
-  try {
-    // Log sanitized URI to debug config issues in production
-    const sanitizedUri = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
-    console.log(`📡 Attempting connection to: ${sanitizedUri}`);
-    await mongoose.connect(MONGODB_URI, mongoOptions);
-    console.log(`✅ MongoDB connected: ${sanitizedUri}`);
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`📋 API available at http://localhost:${PORT}/api`);
-    });
-  } catch (err) {
-    console.error('❌ MongoDB initial connection failed:', err.message);
-    console.log('🔄 Retrying in 5 seconds...');
-    setTimeout(startServer, 5000);
+async function connectMongo() {
+  while (true) {
+    try {
+      const sanitizedUri = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
+      console.log(`📡 Attempting MongoDB connection to: ${sanitizedUri}`);
+      await mongoose.connect(MONGODB_URI, mongoOptions);
+      console.log(`✅ MongoDB connected!`);
+      break; // Exit loop on success
+    } catch (err) {
+      console.error('❌ MongoDB connection failed:', err.message);
+      console.log('🔄 Retrying in 10 seconds...');
+      await new Promise(resolve => setTimeout(resolve, 10000));
+    }
   }
 }
 
 mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️  MongoDB disconnected - Mongoose will auto-reconnect');
+  console.warn('⚠️  MongoDB disconnected - attempting to reconnect...');
+  connectMongo(); // Re-trigger connection loop on disconnect
 });
 
 mongoose.connection.on('reconnected', () => {
@@ -101,9 +100,16 @@ mongoose.connection.on('reconnected', () => {
 
 mongoose.connection.on('error', (err) => {
   console.error('❌ MongoDB error:', err.message);
-  // Don't exit - let Mongoose handle reconnection
 });
 
-startServer();
+// ─── Start HTTP server FIRST so Render's port scan succeeds ──────────────────
+// MongoDB connects in the background. API calls will gracefully handle
+// the case when DB is not yet connected.
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📋 API available at http://localhost:${PORT}/api`);
+  // Connect to MongoDB in background after server is up
+  connectMongo();
+});
 
 export default app;
