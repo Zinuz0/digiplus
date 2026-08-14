@@ -9,9 +9,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
-    scaling:
-      minInstances: 0
-      maxInstances: 1
 
   # ─── Node.js Backend ─────────────────────────────────────────────────────────
   - type: web
@@ -33,6 +30,4 @@ services:
         sync: false   # Set to digiplus-embed URL after it deploys
       - key: CLIENT_URL
         sync: false   # Set to Vercel URL after frontend deploys
-    scaling:
-      minInstances: 0
-      maxInstances: 1
+
