@@ -77,8 +77,7 @@ const mongoOptions = {
   serverSelectionTimeoutMS: 8000,   // how long to wait per attempt
   socketTimeoutMS: 60000,
   bufferCommands: true,             // Mongoose buffers ops until connected
-  maxPoolSize: 3,
-  family: 4,                        // Force IPv4
+  maxPoolSize: 3
 };
 
 let isConnecting = false;
