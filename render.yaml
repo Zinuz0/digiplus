@@ -1,0 +1,38 @@
+services:
+  # ─── Python Embedding Service ────────────────────────────────────────────────
+  - type: web
+    name: digiplus-embed
+    runtime: python
+    rootDir: embedding-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    scaling:
+      minInstances: 0
+      maxInstances: 1
+
+  # ─── Node.js Backend ─────────────────────────────────────────────────────────
+  - type: web
+    name: digiplus-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        sync: false   # Set manually in Render dashboard (contains password)
+      - key: LLM_API_KEY
+        sync: false   # Set manually in Render dashboard (contains secret)
+      - key: EMBEDDING_SERVICE_URL
+        sync: false   # Set to digiplus-embed URL after it deploys
+      - key: CLIENT_URL
+        sync: false   # Set to Vercel URL after frontend deploys
+    scaling:
+      minInstances: 0
+      maxInstances: 1
