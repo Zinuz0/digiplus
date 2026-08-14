@@ -64,9 +64,9 @@ export async function analyzeIncident(incident, relevantKnowledge) {
 
   let rawText;
   try {
-    console.log('🤖 Calling Gemini API (gemini-2.5-flash)...');
+    console.log('🤖 Calling Gemini API (gemini-3.5-flash)...');
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash',
       contents: prompt,
       config: { temperature: 0.3 }
     });
