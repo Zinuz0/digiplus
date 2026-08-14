@@ -36,16 +36,26 @@ export default function Dashboard() {
   const loadData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
     try {
-      const [statsData, kbStats, incidentsData] = await Promise.all([
+      const [statsResult, kbStatsResult, incidentsResult] = await Promise.allSettled([
         incidentAPI.getStats(),
         knowledgeAPI.getStats(),
         incidentAPI.getAll({ ...filters, limit: 30 }),
       ]);
-      setStats(statsData);
-      setKnowledgeStats(kbStats);
-      setIncidents(incidentsData.incidents);
-      setPagination(incidentsData.pagination);
-      setError(null);
+
+      if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+      if (kbStatsResult.status === 'fulfilled') setKnowledgeStats(kbStatsResult.value);
+      if (incidentsResult.status === 'fulfilled') {
+        setIncidents(incidentsResult.value.incidents);
+        setPagination(incidentsResult.value.pagination);
+      }
+
+      // Only show error if ALL calls failed
+      const allFailed = [statsResult, kbStatsResult, incidentsResult].every(r => r.status === 'rejected');
+      if (allFailed) {
+        setError(statsResult.reason?.message || 'Failed to connect to the server');
+      } else {
+        setError(null);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
