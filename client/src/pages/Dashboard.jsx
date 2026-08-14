@@ -32,6 +32,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [wakingUp, setWakingUp] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState(0);
 
   const loadData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -49,11 +51,32 @@ export default function Dashboard() {
         setPagination(incidentsResult.value.pagination);
       }
 
-      // Only show error if ALL calls failed
+      // Check if server is still starting up (DB not ready)
       const allFailed = [statsResult, kbStatsResult, incidentsResult].every(r => r.status === 'rejected');
-      if (allFailed) {
+      const isStartingUp = allFailed && [statsResult, kbStatsResult, incidentsResult].some(
+        r => r.status === 'rejected' && r.reason?.message?.toLowerCase().includes('starting')
+      );
+
+      if (isStartingUp) {
+        setWakingUp(true);
+        setError(null);
+        // Auto-retry countdown
+        let count = 5;
+        setRetryCountdown(count);
+        const timer = setInterval(() => {
+          count--;
+          setRetryCountdown(count);
+          if (count <= 0) {
+            clearInterval(timer);
+            setWakingUp(false);
+            loadData();
+          }
+        }, 1000);
+      } else if (allFailed) {
+        setWakingUp(false);
         setError(statsResult.reason?.message || 'Failed to connect to the server');
       } else {
+        setWakingUp(false);
         setError(null);
       }
     } catch (err) {
@@ -76,6 +99,18 @@ export default function Dashboard() {
               <div className="h-8 bg-slate-700 rounded w-12" />
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (wakingUp) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="glass-card p-8 text-center">
+          <div className="w-12 h-12 rounded-full border-4 border-violet-500 border-t-transparent animate-spin mx-auto mb-4" />
+          <p className="text-slate-200 font-medium text-lg">Server is waking up...</p>
+          <p className="text-slate-400 text-sm mt-2">Free tier spins down after inactivity. Retrying in <span className="text-violet-400 font-bold">{retryCountdown}s</span></p>
         </div>
       </div>
     );

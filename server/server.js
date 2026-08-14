@@ -43,9 +43,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── DB-ready guard ───────────────────────────────────────────────────────────
+// Returns 503 with a specific code while MongoDB is still connecting so the
+// frontend can show a "server starting up" message and auto-retry.
+function requireDB(req, res, next) {
+  if (mongoose.connection.readyState === 1) return next();
+  res.status(503).json({
+    error: 'Service starting up',
+    code: 'DB_NOT_READY',
+    retryAfter: 5
+  });
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/incidents', incidentRoutes);
-app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/incidents', requireDB, incidentRoutes);
+app.use('/api/knowledge', requireDB, knowledgeRoutes);
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
