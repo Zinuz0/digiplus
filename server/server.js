@@ -124,13 +124,13 @@ mongoose.connection.on('error', (err) => {
 // Connect to MongoDB
 connectMongo();
 
-// ─── Local dev: start HTTP server ─────────────────────────────────────────────
-// On Vercel, the app is exported as a serverless function (no listen needed)
-if (process.env.NODE_ENV !== 'production' || process.env.RENDER) {
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
-}
+// Always start the HTTP server
+// On Vercel serverless, this is a no-op since Vercel calls the exported handler directly.
+// On Railway/Render/local, this opens the port.
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
 
 export default app;
+
 
