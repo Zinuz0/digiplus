@@ -69,8 +69,6 @@ const mongoOptions = {
   retryWrites: true,
   retryReads: true,
   family: 4, // Force IPv4 to bypass Render's DNS IPv6 resolution/Atlas TLS handshake issue
-  tls: true,
-  tlsAllowInvalidCertificates: true, // Bypass cert validation if Render container lacks Atlas root CAs
 };
 
 async function connectMongo() {
