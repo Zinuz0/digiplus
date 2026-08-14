@@ -69,12 +69,17 @@ const mongoOptions = {
   retryWrites: true,
   retryReads: true,
   family: 4, // Force IPv4 to bypass Render's DNS IPv6 resolution/Atlas TLS handshake issue
+  tls: true,
+  tlsAllowInvalidCertificates: true, // Bypass cert validation if Render container lacks Atlas root CAs
 };
 
 async function startServer() {
   try {
+    // Log sanitized URI to debug config issues in production
+    const sanitizedUri = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
+    console.log(`📡 Attempting connection to: ${sanitizedUri}`);
     await mongoose.connect(MONGODB_URI, mongoOptions);
-    console.log(`✅ MongoDB connected: ${MONGODB_URI}`);
+    console.log(`✅ MongoDB connected: ${sanitizedUri}`);
     app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log(`📋 API available at http://localhost:${PORT}/api`);
