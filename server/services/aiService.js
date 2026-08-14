@@ -8,11 +8,12 @@ import path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-if (!process.env.LLM_API_KEY) {
-  console.error('❌ LLM_API_KEY is not set in .env file!');
+const apiKey = process.env.LLM_API_KEY || process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('❌ Neither LLM_API_KEY nor GEMINI_API_KEY is set!');
 }
 
-const genAI = new GoogleGenerativeAI(process.env.LLM_API_KEY);
+const genAI = new GoogleGenerativeAI(apiKey);
 
 /**
  * Validate the LLM's JSON response matches expected schema
@@ -67,7 +68,7 @@ function extractJSON(text) {
 export async function analyzeIncident(incident, relevantKnowledge) {
   // gemini-3.1-flash-lite is fast and confirmed working
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.1-flash-lite',
+    model: 'gemini-2.0-flash',
     generationConfig: {
       temperature: 0.3,
     }
