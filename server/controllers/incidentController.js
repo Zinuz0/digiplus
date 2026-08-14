@@ -172,7 +172,7 @@ export async function analyzeIncidentWithAI(req, res) {
       usedSourceIds.includes(k.sourceTicketId)
     );
 
-    incident.aiAnalysis = {
+    const aiAnalysisObj = {
       summary: analysisResult.summary,
       category: analysisResult.category,
       priority: analysisResult.priority,
@@ -183,15 +183,23 @@ export async function analyzeIncidentWithAI(req, res) {
       usedKnowledgeItemIds: usedItems.map(k => k._id).filter(Boolean),
       analyzedAt: new Date()
     };
-    incident.retrievedKnowledge = retrievedKnowledgeSummary;
-    incident.priority = incident.priority || analysisResult.priority;
-    incident.category = incident.category || analysisResult.category;
-    if (incident.status === 'OPEN') incident.status = 'IN_PROGRESS';
 
-    await incident.save();
+    const updateFields = {
+      aiAnalysis: aiAnalysisObj,
+      retrievedKnowledge: retrievedKnowledgeSummary,
+      priority: incident.priority || analysisResult.priority,
+      category: incident.category || analysisResult.category
+    };
+    if (incident.status === 'OPEN') updateFields.status = 'IN_PROGRESS';
+
+    const updatedIncident = await Incident.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateFields },
+      { new: true }
+    );
 
     res.json({
-      incident,
+      incident: updatedIncident,
       analysis: analysisResult,
       retrievedKnowledge: retrievedKnowledgeSummary,
       knowledgeWarning: knowledgeError || undefined
