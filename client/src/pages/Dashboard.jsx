@@ -33,7 +33,38 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [wakingUp, setWakingUp] = useState(false);
-  const [retryCountdown, setRetryCountdown] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+  // Wait until MongoDB is connected by polling /api/health
+  const waitForDB = useCallback(() => {
+    return new Promise((resolve) => {
+      let elapsed = 0;
+      setWakingUp(true);
+      setElapsedSeconds(0);
+
+      const tick = setInterval(() => {
+        elapsed++;
+        setElapsedSeconds(elapsed);
+      }, 1000);
+
+      const poll = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE.replace('/api', '')}/api/health`);
+          const data = await res.json();
+          if (data.mongodb === 'connected') {
+            clearInterval(poll);
+            clearInterval(tick);
+            setWakingUp(false);
+            resolve();
+          }
+        } catch {
+          // Server still waking up, keep polling
+        }
+      }, 3000);
+    });
+  }, [API_BASE]);
 
   const loadData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -51,43 +82,23 @@ export default function Dashboard() {
         setPagination(incidentsResult.value.pagination);
       }
 
-      // Check if server is still starting up (DB not ready)
       const allFailed = [statsResult, kbStatsResult, incidentsResult].every(r => r.status === 'rejected');
-      const isStartingUp = allFailed && [statsResult, kbStatsResult, incidentsResult].some(
-        r => r.status === 'rejected' && r.reason?.message?.toLowerCase().includes('starting')
-      );
-
-      if (isStartingUp) {
-        setWakingUp(true);
-        setError(null);
-        // Auto-retry countdown
-        let count = 5;
-        setRetryCountdown(count);
-        const timer = setInterval(() => {
-          count--;
-          setRetryCountdown(count);
-          if (count <= 0) {
-            clearInterval(timer);
-            setWakingUp(false);
-            loadData();
-          }
-        }, 1000);
-      } else if (allFailed) {
-        setWakingUp(false);
-        setError(statsResult.reason?.message || 'Failed to connect to the server');
-      } else {
-        setWakingUp(false);
-        setError(null);
+      if (allFailed) {
+        // DB not ready yet — wait for health check to confirm DB is up, then retry
+        await waitForDB();
+        return loadData();
       }
+      setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [filters]);
+  }, [filters, waitForDB]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
 
   if (loading) {
     return (
@@ -110,7 +121,10 @@ export default function Dashboard() {
         <div className="glass-card p-8 text-center">
           <div className="w-12 h-12 rounded-full border-4 border-violet-500 border-t-transparent animate-spin mx-auto mb-4" />
           <p className="text-slate-200 font-medium text-lg">Server is waking up...</p>
-          <p className="text-slate-400 text-sm mt-2">Free tier spins down after inactivity. Retrying in <span className="text-violet-400 font-bold">{retryCountdown}s</span></p>
+          <p className="text-slate-400 text-sm mt-2">
+            Free tier spins down after inactivity. This takes ~30 seconds.
+          </p>
+          <p className="text-slate-500 text-xs mt-1">{elapsedSeconds}s elapsed — will load automatically</p>
         </div>
       </div>
     );
